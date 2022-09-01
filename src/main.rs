@@ -1,7 +1,4 @@
 use anyhow::Result;
-use env_logger;
-use log::{error, warn, info, debug};
-use std::{env, fmt::format};
 use structopt::{StructOpt, clap::{self, arg_enum}};
 use std::{
     path::PathBuf,
@@ -62,16 +59,13 @@ async fn main() -> Result<()> {
         tasks
     } = Opt::from_args();
 
-    env::set_var("RUST_LOG", "info");
-    env_logger::init();
-
     let output_collections: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
 
     let (tx, mut rx) = mpsc::channel(1000);
 
     let logging_task = tokio::spawn(async move {
         while let Some(log) = rx.recv().await {
-            info!("log: {:?}", log);
+            println!("log: {:?}", log);
         }
     });
 
@@ -79,7 +73,7 @@ async fn main() -> Result<()> {
         Mode::Series => {
             for _ in 1..=tasks {
                 if let Err(e) = run_function("1".to_string(), tx.clone()).await {
-                    error!("function error: {:?}", e);
+                    println!("function error: {:?}", e);
                 }
             }
         }
@@ -93,7 +87,7 @@ async fn main() -> Result<()> {
                         tokio::spawn(async move {
                             for _ in 1..=tasks {
                                 if let Err(e) = run_function(thread_num.to_string(), clone_tx.clone()).await {
-                                    error!("function error: {:?}", e);
+                                    println!("function println: {:?}", e);
                                 }
                             }
                         })
@@ -105,7 +99,7 @@ async fn main() -> Result<()> {
                 .into_iter()
                 .for_each(|i| {
                     if let Err(e) = i{
-                        error!("join error: {:?}", e);
+                        println!("join println: {:?}", e);
                     }
                 })
         }
@@ -114,6 +108,10 @@ async fn main() -> Result<()> {
     let (logging_task,) = tokio::join!(logging_task);
     logging_task?;
 
+    drop(tx);
+
+    println!("");
+    
     let lock = output_collections.lock().unwrap();
     write_csv(output_csv, lock.to_vec())?;
 
